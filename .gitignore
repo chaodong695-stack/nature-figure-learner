@@ -1,0 +1,34 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# Local KB data must not be committed.
+figure-kb/
+data/
+reports/private/
+cache/
+
+# Temporary and backup files.
+*.bak
+*.bak-*
+backup-*/
+*.tmp
+*.log
+
+# OS/editor files.
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local environment files.
+.env
+.env.*
+venv/
+.venv/

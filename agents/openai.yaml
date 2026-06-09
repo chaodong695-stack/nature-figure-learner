@@ -1,0 +1,7 @@
+interface:
+  display_name: "Nature Figure Learner"
+  short_description: "Analyze paper figures and build a reusable figure pattern library."
+  default_prompt: "Use $nature-figure-learner to analyze this paper figure and extract reusable plotting patterns."
+
+policy:
+  allow_implicit_invocation: true
