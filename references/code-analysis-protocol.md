@@ -21,7 +21,9 @@ Complete step-by-step protocol for analyzing scientific figure plotting code (Py
 2. Load `knowledge-base-schema.md` (output format)
 3. Run the First Invocation Gate from `SKILL.md` / `kb-location-config.md`.
 4. Resolve `<configured-kb-path>` only after the KB path is configured.
-5. Identify backend: Python (matplotlib/seaborn) or R (ggplot2/patchwork)
+5. Identify backend: Python (matplotlib/seaborn) or R (ggplot2/patchwork).
+6. Keep scientific claim, hero panel, and evidence hierarchy as LLM-authored
+   fields; the Python package handles deterministic mechanics.
 
 ---
 
@@ -486,13 +488,28 @@ Structure:
 8. **Parameterized Template**: Full code with PLACEHOLDER markers
 9. **Usage Example**: How to adapt this template
 
-### 9.4 Save to File
-```
-<configured-kb-path>\patterns\chart-type\{chart_type}\{id}.md
+### 9.4 Validate and Save
+
+If an output image is available, run objective self-validation through the
+launcher. Unsupported chart types are reported as capability results.
+
+```bash
+python scripts/figure_kb.py self-validate \
+  --pattern-id code-python-grouped-bar-001 \
+  --output-dir previews
 ```
 
-### 9.5 Update Index
-Add to `index.json` with `source_type: code`
+Save the validated frontmatter and narrative through Repository:
+
+```bash
+python scripts/figure_kb.py pattern save \
+  --input pattern.json \
+  --narrative narrative.md \
+  --duplicate-policy error
+```
+
+The Repository chooses the safe path and derives `index.json` atomically. Do
+not write a pattern file or index entry with an ad-hoc script.
 
 ---
 
@@ -546,7 +563,7 @@ Adapt by:
 ─────────────────────────────────────────────────────────────
 NEXT STEPS
 ─────────────────────────────────────────────────────────────
-→ Query: "Search KB for Python bar chart templates"
+→ Query: `python scripts/figure_kb.py query --source-type code --tag-all python`
 → Apply: "Use code-python-grouped-bar-001 for my new figure"
 ═══════════════════════════════════════════════════════════════
 ```
@@ -585,6 +602,8 @@ Before marking WF2 complete:
 - [ ] Export settings recorded
 - [ ] Parameterized template created with PLACEHOLDER markers
 - [ ] All configurable parameters documented
-- [ ] KB entry file saved
-- [ ] `index.json` updated
+- [ ] Objective self-validation run when a renderable chart is available
+- [ ] Scientific claim, hero panel, and evidence hierarchy reviewed by the LLM
+- [ ] KB entry saved with `pattern save`
+- [ ] Derived index updated by the Repository
 - [ ] Structured report presented to user

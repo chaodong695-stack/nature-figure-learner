@@ -23,8 +23,7 @@ See `kb-location-config.md` for the First Invocation Gate and path resolution or
 
 ```
 figure-kb/
-├── index.json                    # Primary index (flat JSON array for fast queries)
-├── rebuild_index.py              # Script to rebuild index from all .md files
+├── index.json                    # Derived index; rebuild with the repository CLI
 ├── patterns/
 │   ├── chart-type/               # Organized by chart type
 │   │   ├── grouped-bar/
@@ -62,7 +61,7 @@ figure-kb/
     └── extracted-palettes.json   # Quick hex palette lookup
 ```
 
-**File placement**: Each analyzed pattern is saved as one `.md` file in the most relevant subdirectory (e.g., `patterns/chart-type/grouped-bar/pattern-003.md`). Cross-category links are handled via `index.json`.
+**File placement**: Each analyzed pattern is saved as one `.md` file in the most relevant subdirectory (e.g., `patterns/chart-type/grouped-bar/pattern-003.md`). Cross-category links are handled by the derived `index.json`.
 
 ---
 
@@ -259,11 +258,11 @@ The index is a **flat JSON array** of entry summaries for fast querying.
     "layout_archetype": "quantitative-grid",
     "tags": ["method-comparison", "ML-benchmark", "6-methods"],
     "quality_rating": 4,
-  "validation_score": 4,
-  "application_count": 0,
-  "memory_score": {"total": 82.5},
-  "matched_nature_figure_pattern": 1,
-  "analysis_date": "2026-06-05"
+    "validation_score": 4,
+    "application_count": 0,
+    "memory_score": {"total": 82.5},
+    "matched_nature_figure_pattern": 1,
+    "analysis_date": "2026-06-05"
   },
   {
     "id": "pattern-002",
@@ -274,69 +273,28 @@ The index is a **flat JSON array** of entry summaries for fast querying.
 ```
 
 ### Update Protocol
-- **Add entry**: Create `.md` file → append to `index.json`
-- **Remove entry**: Delete `.md` file → remove from `index.json`
-- **Modify entry**: Edit `.md` file → update corresponding object in `index.json`
+Markdown frontmatter and narrative are the authoritative record. Use the
+Repository through the launcher for all writes; it validates the pattern,
+preserves the narrative, applies duplicate policy, and atomically rebuilds the
+derived index.
 
-### Rebuild Command
-If `index.json` becomes out of sync or corrupted:
 ```bash
-python <configured-kb-path>\rebuild_index.py
+python scripts/figure_kb.py pattern save --input pattern.json --narrative narrative.md
+python scripts/figure_kb.py index audit
+python scripts/figure_kb.py index rebuild
 ```
-This scans all `.md` files in `patterns/`, parses YAML frontmatter, and regenerates `index.json`.
+
+Do not append to, delete from, or hand-edit `index.json`.
 
 ---
 
 ## Query Operations
 
-### Q1: Find by Chart Type
-```python
-import json
-from pathlib import Path
-
-kb_path = Path("<configured-kb-path>")
-with open(kb_path / "index.json", encoding="utf-8") as f:
-    index = json.load(f)
-
-matches = [e for e in index if e["chart_type"] == "grouped-bar"]
-```
-
-### Q2: Find by Journal and Year
-```python
-matches = [e for e in index 
-           if e["source_journal"] == "Nature" and e["source_year"] == 2026]
-```
-
-### Q3: Find by Multiple Criteria
-```python
-matches = [e for e in index 
-           if e["chart_type"] == "grouped-bar" 
-           and e["color_scheme"] == "nature-nmi-pastel"
-           and e["quality_rating"] >= 4]
-```
-
-### Q4: Find by Tags
-```python
-target_tags = {"ML-benchmark", "method-comparison"}
-matches = [e for e in index if target_tags.issubset(set(e["tags"]))]
-```
-
-### Q5: Sort by Memory Score, Quality, or Usage
-```python
-def ranking_score(entry):
-    return (
-        (entry.get("memory_score") or {}).get("total", 0),
-        entry.get("quality_rating") or 0,
-        entry.get("validation_score") or 0,
-        entry.get("application_count") or 0,
-    )
-
-# Best evidence-backed patterns
-top_ranked = sorted(index, key=ranking_score, reverse=True)[:5]
-
-# Most-used patterns
-most_used = sorted(index, key=lambda e: e["application_count"], reverse=True)[:5]
-```
+Use `scripts/figure_kb.py query` and the mappings in
+`references/query-templates.md`. The Python query module owns filtering,
+case-insensitive journal/tag matching, fixed similarity weights, and stable
+ordering. This document only defines field semantics and must not duplicate
+executable query logic.
 
 ---
 
@@ -344,19 +302,19 @@ most_used = sorted(index, key=lambda e: e["application_count"], reverse=True)[:5
 
 ### Protocol 1: Add New Entry
 1. Analyze figure via WF1 or WF2
-2. Generate unique `id` (e.g., `pattern-{next_number}` or `{journal}-{year}-fig{n}`)
-3. Create `.md` file in appropriate subdirectory
-4. Append entry summary to `index.json`
-5. Optionally update `cache/extracted-palettes.json` if color scheme is new
+2. Generate a valid unique `id` (the Repository checks path safety)
+3. Prepare validated frontmatter and the Markdown narrative
+4. Run `pattern save` with the requested duplicate policy
+5. Optionally update `cache/extracted-palettes.json` as a separate semantic artifact
 
 ### Protocol 2: Remove Entry
-1. Delete `.md` file
-2. Remove corresponding object from `index.json`
+1. Remove the authoritative `.md` file through the approved repository workflow
+2. Run `index rebuild`
 3. Recompute any cached aggregates if necessary
 
 ### Protocol 3: Update Entry
-1. Edit `.md` file (modify YAML frontmatter or Markdown body)
-2. Update corresponding fields in `index.json`
+1. Update the `.md` file through Repository support so Markdown remains authoritative
+2. Run `index rebuild` when an external edit has been repaired
 3. Set `analysis_date` to current date if substantive change
 
 ### Protocol 4: Rebuild Index
@@ -367,12 +325,12 @@ Run when:
 
 Command:
 ```bash
-python rebuild_index.py
+python scripts/figure_kb.py index rebuild
 ```
 
 ### Protocol 5: Deduplication Check
 Before adding a new entry, check for near-duplicates:
-1. Query `index.json` for entries with same `source_doi` + `source_figure`
+1. Run `pattern save`; the Repository checks the same `source_doi` + `source_figure`
 2. If match found, decide:
    - **Same figure, different analysis**: Keep both, cross-reference in notes
    - **Same figure, redundant**: Skip or merge
@@ -400,7 +358,7 @@ Periodically review entries with:
 When KB exceeds ~1000 entries, add `figure-kb/index.sqlite`:
 - Markdown files remain the source of truth
 - SQLite provides indexed queries and full-text search
-- `rebuild_index.py` generates both `index.json` (for compatibility) and `index.sqlite`
+- `index rebuild` generates `index.json`; any future database projection must remain derived from Markdown
 
 Schema:
 ```sql

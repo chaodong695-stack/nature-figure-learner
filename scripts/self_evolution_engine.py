@@ -21,10 +21,26 @@ import json
 import math
 import re
 import shutil
+import sys
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 from statistics import mean, median
+
+# Keep this standalone helper usable from a source checkout without install.
+_SOURCE_ROOT = Path(__file__).resolve().parents[1] / "src"
+if str(_SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SOURCE_ROOT))
+
+from nature_figure_learner.models import FigurePattern
+from nature_figure_learner.repository import (
+    DuplicatePolicy,
+    iter_pattern_files,
+    read_pattern_document,
+    rebuild_index,
+    save_pattern,
+    update_pattern,
+)
 
 
 ALL_CHART_TYPES = [
@@ -36,9 +52,11 @@ ALL_CHART_TYPES = [
 
 
 class EvolutionEngine:
-    def __init__(self, kb_path):
-        self.kb_path = Path(kb_path)
+    def __init__(self, kb_path, *, logger=None, stream=None):
+        self.kb_path = Path(kb_path).resolve(strict=False)
         self.index_file = self.kb_path / "index.json"
+        self.logger = logger
+        self.stream = sys.stderr if logger is None and stream is None else stream
         self.archive_path = self.kb_path / "archive"
         self.meta_patterns_path = self.kb_path / "meta-patterns"
         self.reflections_path = self.kb_path / "reflections"
@@ -50,17 +68,52 @@ class EvolutionEngine:
         self.reflections_path.mkdir(parents=True, exist_ok=True)
 
     def load_index(self):
-        """Load KB index."""
-        if not self.index_file.exists():
-            return []
-        with open(self.index_file, encoding="utf-8") as f:
-            return json.load(f)
+        """Load complete pattern records from authoritative Markdown sources."""
+        index = []
+        for path in iter_pattern_files(self.kb_path):
+            document = read_pattern_document(path)
+            entry = document.pattern.model_dump(mode="json", exclude_none=False)
+            entry["file"] = path.relative_to(self.kb_path).as_posix()
+            index.append(entry)
+        return index
 
     def save_index(self, index):
-        """Save KB index."""
-        self.index_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.index_file, "w", encoding="utf-8") as f:
-            json.dump(index, f, indent=2, ensure_ascii=False)
+        """Persist pattern fields through Repository-backed Markdown updates."""
+        updates_by_id = {
+            entry.get("id"): {
+                key: value
+                for key, value in entry.items()
+                if key in FigurePattern.model_fields and key != "id"
+            }
+            for entry in index
+            if entry.get("id") and entry.get("type") not in {"meta_pattern", "style_reflection"}
+        }
+        if not updates_by_id:
+            return
+
+        snapshots = []
+        for path in iter_pattern_files(self.kb_path):
+            document = read_pattern_document(path)
+            if document.pattern.id in updates_by_id:
+                snapshots.append(document)
+
+        try:
+            for pattern_id, updates in updates_by_id.items():
+                update_pattern(self.kb_path, pattern_id, updates)
+        except Exception:
+            for document in snapshots:
+                try:
+                    save_pattern(
+                        self.kb_path,
+                        document.pattern,
+                        document.narrative,
+                        duplicate_policy=DuplicatePolicy.OVERWRITE,
+                    )
+                except Exception as rollback_error:
+                    self._log(
+                        f"Failed to rollback pattern {document.pattern.id}: {rollback_error}"
+                    )
+            raise
 
     # ------------------------------------------------------------------
     # Mechanism 1: memory scoring and learning artifact backfill
@@ -244,15 +297,24 @@ class EvolutionEngine:
                 if all((s.get("quality_rating") or 0) > quality + 1.0 for s in similar):
                     to_archive.append((pattern_id, "superseded", entry))
 
-        archived_ids = []
+        archived = []
         for pattern_id, reason, entry in to_archive:
             if self._archive_pattern(entry, reason):
-                archived_ids.append(pattern_id)
+                archived.append((pattern_id, reason, entry))
 
-        if archived_ids:
-            new_index = [e for e in index if e.get("id") not in archived_ids]
-            self.save_index(new_index)
+        if archived:
+            try:
+                rebuild_index(self.kb_path)
+            except Exception:
+                for _pattern_id, reason, entry in reversed(archived):
+                    archive_path = self.archive_path / reason / Path(entry["file"]).name
+                    source_path = (self.kb_path / entry["file"]).resolve(strict=False)
+                    if archive_path.exists():
+                        source_path.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.move(str(archive_path), str(source_path))
+                raise
 
+        archived_ids = {pattern_id for pattern_id, _reason, _entry in archived}
         return [(pid, reason, entry) for pid, reason, entry in to_archive if pid in archived_ids][:5]
 
     def _find_similar_patterns(self, pattern, index):
@@ -265,7 +327,19 @@ class EvolutionEngine:
         ]
 
     def _archive_pattern(self, entry, reason):
-        pattern_file = self.kb_path / entry.get("file", "")
+        try:
+            relative_file = Path(entry.get("file", ""))
+            if (
+                relative_file.is_absolute()
+                or relative_file.drive
+                or ".." in relative_file.parts
+            ):
+                raise ValueError("archive source must be a relative path")
+            pattern_file = (self.kb_path / relative_file).resolve(strict=False)
+            pattern_file.relative_to(self.kb_path)
+        except (TypeError, ValueError):
+            self._log(f"Refusing to archive path outside KB: {entry.get('file')}")
+            return False
         if not pattern_file.exists():
             return False
 
@@ -276,7 +350,7 @@ class EvolutionEngine:
             shutil.move(str(pattern_file), str(archive_dest))
             return True
         except OSError as exc:
-            print(f"Failed to archive {entry.get('id')}: {exc}")
+            self._log(f"Failed to archive {entry.get('id')}: {exc}")
             return False
 
     # ------------------------------------------------------------------
@@ -486,7 +560,12 @@ class EvolutionEngine:
     # ------------------------------------------------------------------
 
     def analyze_extraction_failures(self, index):
-        failures = [e for e in index if e.get("validation_score", 5) < 3]
+        failures = [
+            entry
+            for entry in index
+            if entry.get("validation_score") is not None
+            and entry.get("validation_score") < 3
+        ]
         if len(failures) < 5:
             return None
 
@@ -640,29 +719,29 @@ class EvolutionEngine:
         return int(coverage_score + memory_score + usage_score + feedback_score)
 
     def run_full_evolution(self):
-        print("Loading KB index...")
+        self._log("Loading KB index...")
         index = self.load_index()
         if not index:
             return {"error": "KB is empty"}
 
-        print("[1/6] Backfilling memory scores and learning artifacts...")
+        self._log("[1/6] Backfilling memory scores and learning artifacts...")
         index = self.enrich_memory_artifacts(index)
 
-        print("[2/6] Running archive-first pattern pruning...")
+        self._log("[2/6] Running archive-first pattern pruning...")
         pruned = self.prune_patterns(index)
         index = self.load_index()
 
-        print("[3/6] Running pattern generalization...")
+        self._log("[3/6] Running pattern generalization...")
         meta_patterns = self.generalize_patterns(index)
 
-        print("[4/6] Synthesizing style reflections...")
+        self._log("[4/6] Synthesizing style reflections...")
         style_reflections = self.synthesize_style_reflections(index)
 
-        print("[5/6] Analyzing extraction failures and learning recommendations...")
+        self._log("[5/6] Analyzing extraction failures and learning recommendations...")
         correction = self.analyze_extraction_failures(index)
         recommendations = self.generate_learning_recommendations(index)
 
-        print("[6/6] Calculating KB health...")
+        self._log("[6/6] Calculating KB health...")
         health = self.calculate_kb_health(index)
 
         return {
@@ -673,6 +752,15 @@ class EvolutionEngine:
             "recommendations": recommendations,
             "kb_health": health,
         }
+
+    def _log(self, message):
+        if self.logger is not None:
+            if callable(self.logger):
+                self.logger(message)
+            else:
+                self.logger.info(message)
+        elif self.stream is not None:
+            print(message, file=self.stream)
 
     def _mode(self, values):
         if not values:

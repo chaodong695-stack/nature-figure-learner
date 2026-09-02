@@ -14,9 +14,39 @@ The learning/ingestion complement to `nature-figure`. This skill analyzes scient
 
 ## Skill vs Agent Boundary
 
-This skill is documentation plus helper scripts. It does not execute by itself, monitor the user, pop up feedback forms, update the KB, or call `nature-figure` automatically.
+This skill is documentation plus a small, install-free Python package and CLI. It does not execute by itself, monitor the user, pop up feedback forms, update the KB, or call `nature-figure` automatically.
 
 The **agent** is the executor. The agent must read this skill, decide which workflow applies, ask the user for optional feedback, run scripts, write KB files, and explain recommendations. Always phrase automated behavior as "the agent should..." or "run the helper script..." rather than "the skill automatically...".
+
+## Deterministic Tool Boundary
+
+Use `scripts/figure_kb.py` for repeatable operations. The launcher emits one
+JSON Envelope on stdout; progress and debug information belong on stderr.
+
+```bash
+python scripts/figure_kb.py schema export
+python scripts/figure_kb.py pattern validate --input pattern.json
+python scripts/figure_kb.py pattern save --input pattern.json --narrative narrative.md
+python scripts/figure_kb.py query --chart-type grouped-bar --limit 5
+python scripts/figure_kb.py self-validate --pattern-id pattern-001 --output-dir previews
+python scripts/figure_kb.py index audit
+python scripts/figure_kb.py index rebuild
+```
+
+The LLM owns `scientific_claim`, `hero_panel`, `evidence_hierarchy`, and the
+optional `ScientificReview`: these require scientific interpretation. Python
+owns schema validation, path resolution, DOI deduplication, Markdown
+persistence, derived-index rebuilds, deterministic query ranking, synthetic
+mock data, rendering adapters, and objective image validation. An unsupported
+renderer is a capability result, not a validation failure.
+
+The first renderer set supports `grouped-bar`, `stacked-bar`, `horizontal-bar`,
+`line-trend`, `multi-line`, `scatter`, `bubble`, `heatmap`, `violin`, and
+`box`. Other schema chart types are valid patterns but return an
+`unsupported` capability result until an adapter exists.
+
+Normal workflows run the launcher commands only; they do not run the test
+suite. Tests are for development and release verification.
 
 ---
 
@@ -87,7 +117,7 @@ New configuration should be written to the Codex config path. The legacy `.claud
 
 The KB contains:
 
-- `index.json`: primary index for fast queries
+- `index.json`: derived index for fast queries (Markdown is authoritative)
 - `patterns/`: organized by chart type, color scheme, layout archetype, and journal
 - `meta-patterns/`: generalized templates synthesized from mature pattern clusters
 - `reflections/`: style reflections generated from repeated success/failure evidence
@@ -152,6 +182,9 @@ python scripts/kb_location_manager.py --get-path
 python scripts/kb_location_manager.py --setup
 python scripts/kb_location_manager.py --status
 python scripts/kb_location_manager.py --reconfigure
+python scripts/figure_kb.py query --chart-type grouped-bar --limit 5
+python scripts/figure_kb.py pattern save --input pattern.json --narrative narrative.md
+python scripts/figure_kb.py self-validate --pattern-id pattern-001 --output-dir previews
 python scripts/self_evolution_engine.py <configured-kb-path>
 ```
 
@@ -173,7 +206,7 @@ Do not store generated KB data inside the skill folder. The KB location is user 
 
 - After WF1/WF2 creates a pattern, the agent should offer a skippable feedback prompt.
 - Each entry should support `memory_score`, `success_cases`, `failure_cases`, and `recommendation_rationale`.
-- Query ranking should prefer `memory_score.total` when present, then fall back to quality, validation, and usage.
+- Query ranking is implemented by the CLI; do not recreate sorting logic in a workflow note or ad-hoc script.
 - Growth reports should include "what to learn next" recommendations.
 
 ### Stage 2 Optimizations
@@ -209,7 +242,7 @@ If `scripts/kb_location_manager.py --get-path` returns `NOT_CONFIGURED`, stop an
 
 ### KB Directory Missing
 
-If a path is configured but `<configured-kb-path>/index.json` is missing, initialize the KB directory structure and create `index.json` with `[]` before continuing.
+If a path is configured but `<configured-kb-path>/index.json` is missing, use the CLI's `index rebuild` command after the Markdown directory is initialized. The index is derived and must not be hand-edited.
 
 ### No Query Matches
 
@@ -217,7 +250,7 @@ If a query returns no results, suggest broader criteria or analyzing new figures
 
 ### Duplicate Entry
 
-Before creating an entry, check `index.json` for the same `source_doi` plus `source_figure`. Ask whether to skip, overwrite, or create a duplicate.
+Before creating an entry, use `pattern save` with its duplicate policy (`error`, `skip`, `overwrite`, or `create-copy`). The Repository checks the same `source_doi` plus `source_figure` without requiring an agent-maintained index.
 
 ---
 

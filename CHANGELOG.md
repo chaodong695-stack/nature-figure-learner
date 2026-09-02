@@ -4,10 +4,14 @@ All notable changes to this repository should be documented here.
 
 ## Unreleased
 
-- Added public repository documentation.
-- Documented standalone use without `nature-figure`.
-- Documented multi-agent compatibility for Codex, Claude, Hermes/Hermess-style agents, and generic agents.
-- Added public safety guidance for excluding real KB data and private assets.
+- Added strict FigurePattern models, Markdown-authoritative Repository storage,
+  deterministic queries, seeded mock data, renderer adapters, objective
+  validation, and the install-free JSON-Envelope CLI.
+- Integrated self-evolution updates with Markdown-backed Repository writes and
+  strict derived-index rebuilding.
+- Documented standalone use without `nature-figure`, explicit bridge use,
+  agent compatibility, dependencies, verification, and public-repository
+  safety.
 
 ## 0.2.0
 

@@ -3,7 +3,8 @@
 Complete step-by-step protocol for analyzing a scientific figure from an image (PNG, screenshot, or PDF page).
 
 **Input**: Image file + optional metadata (DOI, journal, figure number)  
-**Output**: Deep analysis report + KB entry (.md file) + index update
+**Output**: Deep analysis report plus a validated KB entry saved through the
+Repository CLI. The Markdown entry is authoritative; `index.json` is derived.
 
 ---
 
@@ -23,7 +24,8 @@ Complete step-by-step protocol for analyzing a scientific figure from an image (
 2. Ensure `knowledge-base-schema.md` is loaded (for output format)
 3. Run the First Invocation Gate from `SKILL.md` / `kb-location-config.md`.
 4. Resolve `<configured-kb-path>` only after the KB path is configured.
-5. Load current `index.json` to determine next available ID; if it is missing after setup, create an empty `[]` index before continuing.
+5. Do not hand-edit or precompute IDs from `index.json`; prepare a valid pattern
+   and let `pattern save` apply duplicate policy and update the derived index.
 
 ---
 
@@ -221,41 +223,44 @@ axes[3].set_axis_off()
 
 **Goal**: Verify analysis quality by attempting to reproduce the figure.
 
-### 6.1 Generate Mock Data
-Create synthetic data matching the structure:
-- If bar chart: random values for N methods × M metrics
-- If scatter: random x-y pairs
-- If heatmap: random matrix
-- Use the **same dimensions** as the original (same # of methods, metrics, etc.)
+### 6.1 Generate Mock Data and Preview
 
-### 6.2 Apply Extracted Parameters
-Write minimal code using extracted parameters:
-- Colors: Use the extracted hex codes
-- Layout: Use the estimated grid structure
-- Typography: Use the estimated font family and sizes
-- Palette: Use the identified color scheme
+Prepare a `MockDataSpec` only for dimensions that are visible in the source.
+The deterministic generator owns seed derivation and typed payload shape. Run
+the full mock/render/objective-validation path through the CLI:
 
-### 6.3 Generate Preview
-Run the code, produce a preview image.
+```bash
+python scripts/figure_kb.py self-validate \
+  --pattern-id pattern-001 \
+  --spec mock-spec.json \
+  --output-dir previews
+```
 
-### 6.4 Visual Comparison
-Compare preview vs. original:
-- **Color match**: Do colors look similar? ✅ / ⚠️ / ❌
-- **Layout match**: Is grid structure correct? ✅ / ⚠️ / ❌
-- **Typography match**: Do font sizes look right? ✅ / ⚠️ / ❌
-- **Overall similarity**: Does it "feel" like the same style? ✅ / ⚠️ / ❌
+The renderer supports grouped/stacked/horizontal bars, line and multi-line,
+scatter and bubble, heatmap, violin, and box. Other chart types return
+`unsupported` with exit code 0. A renderer error is distinct from an objective
+validation failure.
 
-### 6.5 Assign Validation Score
-Based on comparison:
-- **5**: Excellent match, all parameters accurate
-- **4**: Good match, minor discrepancies (e.g., font size slightly off)
-- **3**: Acceptable match, 1-2 parameters need refinement
-- **2**: Poor match, several parameters incorrect
-- **1**: Failed to reproduce, major extraction errors
+### 6.2 Objective Checks
 
-### 6.6 Decision
-- **If score ≥ 4**: Proceed to KB entry creation (high-quality analysis)
-- **If score < 4**: Flag as "needs manual review", note discrepancies, still create entry but mark `confidence: low`
+Python checks schema dimensions, image readability and non-blank pixels,
+expected dimensions, panel metadata, layout metadata, palette proximity, and
+font fallback. The command returns checks and an objective score in the JSON
+Envelope. It does not assign a scientific validation claim.
+
+### 6.3 Scientific Review
+
+The LLM compares the preview with the source and records the scientific
+interpretation: whether the claimed relationship is represented, which panel
+is the hero panel, the evidence hierarchy, and any limitations. Keep this
+`ScientificReview` separate from objective checks; do not synthesize it from
+pixel scores.
+
+### 6.4 Decision
+
+Use objective warnings and the LLM's review to decide whether extracted
+parameters need manual review. A low objective score, render error, or
+unsupported capability must be described separately in the pattern narrative.
 
 ---
 
@@ -266,12 +271,15 @@ Based on comparison:
 **Trigger**: If this is a newly created figure (not just analyzed from literature), or if user requests comparative analysis.
 
 ### 7.1 Query KB for Similar Patterns
-Search `index.json` for entries with:
-- Same `chart_type`
-- Same `layout_archetype`
-- Similar `tags`
+Run a read-only query for entries with the same `chart_type`,
+`layout_archetype`, and similar tags:
 
-Retrieve top 3 matches.
+```bash
+python scripts/figure_kb.py query --chart-type grouped-bar --limit 3
+```
+
+Use the actual chart type and add layout/tag filters as needed. The CLI owns
+filtering and ranking; the agent owns the scientific comparison.
 
 ### 7.2 Side-by-Side Comparison
 For each reference, compare:
@@ -308,9 +316,9 @@ comparative_notes:
 **Goal**: Create a permanent record in the knowledge base.
 
 ### 8.1 Generate Unique ID
-- **Auto-generated**: `pattern-{next_number}` (e.g., `pattern-001`, `pattern-002`, ...)
-- **Source-based**: `{journal}-{year}-fig{n}` (e.g., `nature-2026-fig3`)
-- Check `index.json` to ensure ID is unique
+- Use a valid stable slug such as `pattern-001` or `nature-2026-fig3`.
+- `pattern save` validates the ID, checks duplicates, and applies the selected
+  duplicate policy. Do not derive uniqueness by editing `index.json`.
 
 ### 8.2 Construct YAML Frontmatter
 Using the schema from `knowledge-base-schema.md`, populate all fields:
@@ -370,37 +378,21 @@ In Markdown body, write structured sections:
 10. **Application History**: Initially empty
 11. **Comparative Learning Insights**: From Step 7 if applicable
 
-### 8.4 Save to File
-Determine subdirectory based on primary category:
-- Primary category: `chart_type` (most specific)
-- Save to: `<configured-kb-path>\patterns\chart-type\{chart_type}\{id}.md`
+### 8.4 Save and Derive the Index
 
-Example:
-```
-<configured-kb-path>\patterns\chart-type\grouped-bar\pattern-003.md
+Write the narrative to a temporary agent-owned file, then run:
+
+```bash
+python scripts/figure_kb.py pattern save \
+  --input pattern.json \
+  --narrative narrative.md \
+  --duplicate-policy error
 ```
 
-### 8.5 Update Index
-Append entry summary to `index.json`:
-```json
-{
-  "id": "pattern-003",
-  "file": "patterns/chart-type/grouped-bar/pattern-003.md",
-  "source_type": "image",
-  "source_journal": "Nature",
-  "source_year": 2026,
-  "chart_type": "grouped-bar",
-  "color_scheme": "nature-nmi-pastel",
-  "layout_archetype": "quantitative-grid",
-  "tags": ["method-comparison", "ML-benchmark", "6-methods"],
-  "quality_rating": null,
-  "validation_score": 4,
-  "application_count": 0,
-  "memory_score": null,
-  "matched_nature_figure_pattern": 1,
-  "analysis_date": "2026-06-05"
-}
-```
+The Repository chooses the safe chart-type path, validates frontmatter,
+preserves the narrative, checks DOI/figure duplicates, and atomically updates
+the derived `index.json`. Use `skip`, `overwrite`, or `create-copy` only when
+the user explicitly chooses that duplicate policy.
 
 ---
 
@@ -483,7 +475,8 @@ Optional: do you want to rate this new pattern now?
 - or "skip"
 ```
 
-If the user provides feedback, update the KB entry and `index.json`:
+If the user provides feedback, update the Markdown entry through Repository
+support and let the derived index be rebuilt:
 
 ```yaml
 quality_rating: 4
@@ -524,9 +517,9 @@ If DOI/journal not provided:
 - Suggest manual review
 
 ### Duplicate Detection
-Before creating entry, query `index.json` for:
-- Same `source_doi` + `source_figure`
-- If found: Ask user "Entry already exists. Overwrite? Create duplicate? Cancel?"
+Run `pattern save` with `--duplicate-policy error` by default. If the Repository
+reports a duplicate, ask the user whether to `skip`, `overwrite`, or
+`create-copy`; do not resolve the conflict by editing `index.json`.
 
 ---
 
@@ -536,8 +529,9 @@ Before marking WF1 complete, ensure:
 - [ ] All 7 layers of analysis framework extracted
 - [ ] YAML frontmatter complete with all required fields
 - [ ] Markdown narrative written with structured sections
-- [ ] Self-validation performed (Step 6)
-- [ ] KB entry file saved
-- [ ] `index.json` updated
+- [ ] Self-validation command run (Step 6), if the chart type is supported
+- [ ] Scientific claim, hero panel, and evidence hierarchy reviewed by the LLM
+- [ ] KB entry saved with `pattern save`
+- [ ] Derived index updated by the Repository
 - [ ] Structured report presented to user
 - [ ] User informed of next steps (query/apply pattern)
