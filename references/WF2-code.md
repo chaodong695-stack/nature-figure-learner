@@ -2,33 +2,41 @@
 
 Complete step-by-step protocol for analyzing scientific figure plotting code (Python matplotlib/seaborn or R ggplot2).
 
-**Input**: Plotting script (.py or .R file) + optional metadata  
-**Output**: Technical pattern extraction + parameterized template + KB entry
+**Input**: Plotting script (.py or .R file) + optional metadata
+**Output**: Technical pattern extraction + parameterized template. Save a KB
+entry through the Repository CLI only when the user explicitly requests
+learning, import, or persistence.
 
 ---
 
 ## Prerequisites
 
 ### User Provides
+
 - Plotting script file (.py, .R, or code block)
 - **Optional**:
   - Description of what the figure shows
   - Associated paper DOI/journal
-  - Output figure image (for validation)
+  - Output figure image (for separate visual comparison; not consumed by CLI self-validation)
 
 ### Agent Preparation
+
 1. Load `analysis-framework.md` (extraction taxonomy)
-2. Load `knowledge-base-schema.md` (output format)
+2. Load `schema-notes.md` (output format)
 3. Run the First Invocation Gate from `SKILL.md` / `kb-location-config.md`.
 4. Resolve `<configured-kb-path>` only after the KB path is configured.
-5. Identify backend: Python (matplotlib/seaborn) or R (ggplot2/patchwork)
+5. Identify backend: Python (matplotlib/seaborn) or R (ggplot2/patchwork).
+6. Keep scientific claim, hero panel, and evidence hierarchy as LLM-authored
+   fields; the Python package handles deterministic mechanics.
 
 ---
 
 ## Step 1: Backend Detection and Parsing
 
 ### 1.1 Identify Backend
+
 **Python indicators**:
+
 ```python
 import matplotlib
 import matplotlib.pyplot as plt
@@ -36,6 +44,7 @@ import seaborn as sns
 ```
 
 **R indicators**:
+
 ```r
 library(ggplot2)
 library(patchwork)
@@ -45,12 +54,16 @@ library(ComplexHeatmap)
 **Record**: `backend: python` or `backend: r`
 
 ### 1.2 Parse Imports and Dependencies
+
 List all plotting-related imports/libraries:
+
 - Python: matplotlib, seaborn, pandas, numpy, scipy.stats
 - R: ggplot2, patchwork, ComplexHeatmap, ggrepel, cowplot, ggarrange
 
 ### 1.3 Identify Script Structure
+
 Locate key sections:
+
 - Configuration (rcParams, theme settings)
 - Data loading/preprocessing
 - Figure creation (fig, ax = plt.subplots() or ggplot())
@@ -62,7 +75,9 @@ Locate key sections:
 ## Step 2: Configuration Extraction
 
 ### 2.1 Font Configuration (Python)
+
 Extract from rcParams:
+
 ```python
 plt.rcParams['font.family']          # e.g., 'sans-serif'
 plt.rcParams['font.sans-serif']      # e.g., ['Arial', 'Helvetica', ...]
@@ -72,22 +87,28 @@ plt.rcParams['pdf.fonttype']         # 42 for editable PDF text
 ```
 
 **Record**:
+
 - `font_family`: Extracted family
 - `base_font_size_pt`: Base size
 
 ### 2.2 Font Configuration (R)
+
 Extract from theme:
+
 ```r
 theme_set(theme_classic(base_size = 7, base_family = "Arial"))
 theme(..., text = element_text(family = "Arial", size = 7))
 ```
 
 **Record**:
+
 - `font_family`: Extracted family
 - `base_font_size_pt`: Base size
 
 ### 2.3 Color Definitions
+
 **Python**:
+
 ```python
 PALETTE = {
     'blue_main': '#0F4D92',
@@ -98,17 +119,20 @@ colors = ['#0F4D92', '#8BCF8B', ...]
 ```
 
 **R**:
+
 ```r
 palette <- c("#0F4D92", "#8BCF8B", ...)
 scale_color_manual(values = palette)
 ```
 
 **Extract**:
+
 - List of hex codes
 - Semantic names (if available)
 - Order of usage
 
 ### 2.4 Axes and Spines Configuration (Python)
+
 ```python
 plt.rcParams['axes.spines.right']    # False
 plt.rcParams['axes.spines.top']      # False
@@ -117,6 +141,7 @@ plt.rcParams['legend.frameon']       # False
 ```
 
 **R equivalent**:
+
 ```r
 theme(axis.line = element_line(...),
       panel.border = element_blank(),
@@ -128,49 +153,64 @@ theme(axis.line = element_line(...),
 ## Step 3: Figure Dimensions and Layout
 
 ### 3.1 Figure Size (Python)
+
 ```python
 fig, ax = plt.subplots(figsize=(12, 8))
 fig = plt.figure(figsize=(20, 10))
 ```
+
 **Extract**: `figsize` tuple (width, height in inches)
 
 ### 3.2 Figure Size (R)
+
 ```r
 ggsave("output.pdf", width = 183, height = 120, units = "mm")
 svglite("output.svg", width = 7.2, height = 4.7)  # inches
 ```
+
 **Extract**: Width and height (convert to consistent unit)
 
 ### 3.3 Layout Structure (Python)
+
 **GridSpec**:
+
 ```python
 gs = gridspec.GridSpec(2, 3, height_ratios=[2, 1], width_ratios=[1, 1, 1])
 ax1 = fig.add_subplot(gs[0, :])  # Spans all columns
 ```
+
 **Extract**:
+
 - Rows × columns
 - Height ratios
 - Width ratios
 - Spanning cells
 
 **subplot_mosaic** (newer API):
+
 ```python
 fig, axd = plt.subplot_mosaic([['a', 'b'], ['c', 'c']], figsize=(10, 8))
 ```
+
 **Extract**: Layout pattern
 
 ### 3.4 Layout Structure (R)
+
 **patchwork**:
+
 ```r
 p1 + p2 + p3 + plot_layout(ncol = 3)
 (p1 | p2) / p3  # p1 and p2 side-by-side, p3 below spanning
 ```
+
 **Extract**: Layout operators and structure
 
 **ggarrange**:
+
 ```r
 ggarrange(p1, p2, p3, ncol = 3, nrow = 1)
 ```
+
 **Extract**: Rows, columns
 
 ---
@@ -178,45 +218,58 @@ ggarrange(p1, p2, p3, ncol = 3, nrow = 1)
 ## Step 4: Chart Type and Data Mapping
 
 ### 4.1 Identify Chart Types
+
 For each axes/plot object:
 
 **Python bar chart**:
+
 ```python
 ax.bar(x, y, color=colors, ...)
 ax.barh(y, x, ...)  # horizontal
 ```
+
 → Chart type: `grouped-bar` or `horizontal-bar`
 
 **Python line/trend**:
+
 ```python
 ax.plot(x, y, ...)
 ax.fill_between(x, y1, y2, alpha=0.2)
 ```
+
 → Chart type: `line-trend` with uncertainty bands
 
 **Python heatmap**:
+
 ```python
 sns.heatmap(data, cmap='YlOrRd', ...)
 ax.imshow(data, cmap='RdBu_r', ...)
 ```
+
 → Chart type: `heatmap`
 
 **R bar chart**:
+
 ```r
 ggplot(data, aes(x = method, y = value, fill = method)) +
   geom_bar(stat = "identity", ...)
 ```
+
 → Chart type: `grouped-bar`
 
 **R heatmap**:
+
 ```r
 geom_tile(aes(x = x, y = y, fill = value))
 ComplexHeatmap::Heatmap(mat, ...)
 ```
+
 → Chart type: `heatmap`
 
 ### 4.2 Extract Data-to-Visual Mapping
+
 For each plot, identify:
+
 - **Position (x, y)**: What variables?
 - **Color/Fill**: Mapped to what variable?
 - **Size**: If present (e.g., scatter point size)
@@ -227,6 +280,7 @@ For each plot, identify:
 ## Step 5: Export Settings
 
 ### 5.1 Python Export
+
 ```python
 fig.savefig('output.svg', bbox_inches='tight')
 fig.savefig('output.png', dpi=300, bbox_inches='tight')
@@ -234,11 +288,13 @@ fig.savefig('output.pdf', bbox_inches='tight')
 ```
 
 **Extract**:
+
 - Primary format: SVG, PDF, PNG, TIFF?
 - DPI (if raster)
 - `bbox_inches='tight'` used?
 
 ### 5.2 R Export
+
 ```r
 svglite::svglite("output.svg", width = 7, height = 5)
 print(plot)
@@ -254,6 +310,7 @@ dev.off()
 ```
 
 **Extract**:
+
 - Export functions used
 - Output formats
 - DPI/resolution
@@ -263,9 +320,11 @@ dev.off()
 ## Step 6: Helper Functions and Patterns
 
 ### 6.1 Identify Custom Helpers
+
 Look for reusable functions:
 
 **Python**:
+
 ```python
 def make_bar_plot(ax, data, colors, ...):
     # Parameterized bar plot
@@ -277,6 +336,7 @@ def add_significance_brackets(ax, x1, x2, y, pval):
 ```
 
 **R**:
+
 ```r
 make_bar_plot <- function(data, colors, ...) {
     ggplot(data, aes(...)) + geom_bar(...) + ...
@@ -284,15 +344,18 @@ make_bar_plot <- function(data, colors, ...) {
 ```
 
 **Document**:
+
 - Function name
 - Parameters
 - Purpose
 - Reusability potential
 
 ### 6.2 Extract Reusable Patterns
+
 Common patterns to look for:
 
 **Pattern: Dedicated legend panel**:
+
 ```python
 ax_legend = fig.add_subplot(gs[0, 3])
 ax_legend.legend(handles, labels, loc='center', frameon=False)
@@ -300,6 +363,7 @@ ax_legend.set_axis_off()
 ```
 
 **Pattern: In-bar value annotations**:
+
 ```python
 for bar in bars:
     height = bar.get_height()
@@ -308,6 +372,7 @@ for bar in bars:
 ```
 
 **Pattern: Luminance-based text color**:
+
 ```python
 def text_color_from_bg(hex_color):
     # Return 'white' or 'black' based on background luminance
@@ -319,41 +384,51 @@ def text_color_from_bg(hex_color):
 ## Step 7: Statistical and Annotation Layers
 
 ### 7.1 Error Bar Detection
+
 **Python**:
+
 ```python
 ax.bar(..., yerr=std_values, capsize=5)
 ax.errorbar(x, y, yerr=err, fmt='o', ...)
 ```
 
 **R**:
+
 ```r
 geom_errorbar(aes(ymin = y - se, ymax = y + se), width = 0.2)
 ```
 
 **Extract**:
+
 - Error type (variable name like `std`, `sem`, `ci_95`)
 - Capsize/width
 - Color
 
 ### 7.2 Significance Annotation
+
 **Python**:
+
 ```python
 ax.text(x, y, '*', fontsize=16, ha='center')
 ax.plot([x1, x2], [y, y], 'k-', lw=1.5)  # bracket
 ```
 
 **R**:
+
 ```r
 geom_text(aes(x = x, y = y, label = "*"), size = 5)
 geom_segment(aes(x = x1, xend = x2, y = y, yend = y))
 ```
 
 **Extract**:
+
 - Annotation style (asterisks, p-values, brackets)
 - Positioning logic
 
 ### 7.3 Sample Size Annotation
+
 Look for `n=...` in labels:
+
 ```python
 labels = [f'Method A (n=15)', f'Method B (n=20)']
 ```
@@ -365,13 +440,17 @@ labels = [f'Method A (n=15)', f'Method B (n=20)']
 **Goal**: Abstract away data-specific values, keep structural parameters.
 
 ### 8.1 Identify Data-Specific Values
+
 Mark for replacement:
+
 - Actual data arrays/dataframes
 - Specific method names (unless generic like "Method A", "Method B")
 - Hardcoded counts (if not structural)
 
 ### 8.2 Keep Structural Parameters
+
 Preserve:
+
 - Figure dimensions
 - Grid structure
 - Color palette
@@ -379,7 +458,9 @@ Preserve:
 - Layout ratios
 
 ### 8.3 Create Template
+
 **Example (Python grouped-bar)**:
+
 ```python
 import matplotlib.pyplot as plt
 import numpy as np
@@ -419,7 +500,9 @@ plt.close(fig)
 ```
 
 ### 8.4 Document Parameters
+
 List all configurable parameters:
+
 ```yaml
 configurable_parameters:
   - name: figsize
@@ -441,10 +524,12 @@ configurable_parameters:
 ## Step 9: KB Entry Creation
 
 ### 9.1 Generate ID
+
 - Use `code-{backend}-{chart_type}-{number}` format
 - Example: `code-python-grouped-bar-001`
 
 ### 9.2 Construct YAML Frontmatter
+
 ```yaml
 ---
 id: code-python-grouped-bar-001
@@ -465,7 +550,7 @@ tags: [python, matplotlib, method-comparison, bar-chart]
 quality_rating: null
 confidence: high
 analysis_date: 2026-06-05
-validation_score: null  # Code analysis doesn't self-validate
+validation_score: null  # Optional interpreted 1-5 rating; separate from objective_score
 application_count: 0
 backend: python
 figsize: [10, 6]
@@ -475,7 +560,9 @@ dpi: 300
 ```
 
 ### 9.3 Write Analysis Narrative
+
 Structure:
+
 1. **Overview**: What this code creates
 2. **Backend**: Python matplotlib or R ggplot2
 3. **Configuration**: Font, colors, rcParams/theme
@@ -486,13 +573,39 @@ Structure:
 8. **Parameterized Template**: Full code with PLACEHOLDER markers
 9. **Usage Example**: How to adapt this template
 
-### 9.4 Save to File
-```
-<configured-kb-path>\patterns\chart-type\{chart_type}\{id}.md
+### 9.4 Validate, Save, and Optionally Self-Validate
+
+Only execute the persistence sequence when the user explicitly requests
+learning, import, or saving. Otherwise keep `pattern.json` and the narrative
+transient and do not create a KB entry.
+
+The CLI self-validation command reads only a pattern that has already been
+saved. It generates synthetic data and does not read or compare an external
+output image. If an external image is available, analyze it separately with
+WF1 or have the LLM perform the visual comparison; do not represent that
+comparison as the CLI objective score.
+
+Run these commands in order after preparing `pattern.json` and `narrative.md`:
+
+```bash
+# 1. Validate the candidate before writing it.
+python scripts/figure_kb.py pattern validate \
+  --input pattern.json
+
+# 2. Persist the validated record and derive the index atomically.
+python scripts/figure_kb.py pattern save \
+  --input pattern.json \
+  --narrative narrative.md \
+  --duplicate-policy error
+
+# 3. Only after a successful save, run objective self-validation.
+python scripts/figure_kb.py self-validate \
+  --pattern-id code-python-grouped-bar-001 \
+  --output-dir previews
 ```
 
-### 9.5 Update Index
-Add to `index.json` with `source_type: code`
+The Repository chooses the safe path and derives `index.json` atomically. Do
+not write a pattern file or index entry with an ad-hoc script.
 
 ---
 
@@ -526,7 +639,7 @@ REUSABLE PATTERN
 • Right/top spines removed
 
 ─────────────────────────────────────────────────────────────
-KB ENTRY CREATED
+KB ENTRY (ONLY IF PERSISTED; OMIT OTHERWISE)
 ─────────────────────────────────────────────────────────────
 ID: code-python-grouped-bar-001
 File: patterns/chart-type/grouped-bar/code-python-grouped-bar-001.md
@@ -546,7 +659,7 @@ Adapt by:
 ─────────────────────────────────────────────────────────────
 NEXT STEPS
 ─────────────────────────────────────────────────────────────
-→ Query: "Search KB for Python bar chart templates"
+→ Query: `python scripts/figure_kb.py query --source-type code --tag-all python`
 → Apply: "Use code-python-grouped-bar-001 for my new figure"
 ═══════════════════════════════════════════════════════════════
 ```
@@ -556,19 +669,25 @@ NEXT STEPS
 ## Error Handling
 
 ### Incomplete Code
+
 If critical sections are missing (no savefig, no color definitions):
+
 - Document what's present
 - Mark `confidence: low`
 - Suggest requesting complete script
 
 ### Uncommon Backend
+
 If neither matplotlib nor ggplot2:
+
 - Document as `backend: other`
 - Extract what's extractable
 - Note limitations in analysis
 
 ### Data Preprocessing Dominates
+
 If most of the script is data wrangling:
+
 - Focus on plotting commands only
 - Skip data processing details
 - Extract only plot-relevant configuration
@@ -578,6 +697,7 @@ If most of the script is data wrangling:
 ## Checklist
 
 Before marking WF2 complete:
+
 - [ ] Backend identified (Python or R)
 - [ ] Configuration extracted (font, colors, rcParams/theme)
 - [ ] Layout structure documented (figsize, grid)
@@ -585,6 +705,10 @@ Before marking WF2 complete:
 - [ ] Export settings recorded
 - [ ] Parameterized template created with PLACEHOLDER markers
 - [ ] All configurable parameters documented
-- [ ] KB entry file saved
-- [ ] `index.json` updated
+- [ ] Candidate validated with `pattern validate` before any save
+- [ ] `self-validate` run after save when a renderable chart is available
+- [ ] Objective score kept separate from interpreted `validation_score`
+- [ ] Scientific claim, hero panel, and evidence hierarchy reviewed by the LLM
+- [ ] KB entry saved with `pattern save` only when explicitly requested
+- [ ] Derived index updated by the Repository when the entry is persisted
 - [ ] Structured report presented to user

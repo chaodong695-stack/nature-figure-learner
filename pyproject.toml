@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nature-figure-learner"
+version = "0.3.0"
+description = "Deterministic helpers for a scientific figure pattern knowledge base"
+requires-python = ">=3.10"
+dependencies = [
+  "pydantic>=2.10,<3",
+  "PyYAML>=6,<7",
+  "numpy>=1.26,<3",
+  "matplotlib>=3.8,<4",
+  "Pillow>=10,<13",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

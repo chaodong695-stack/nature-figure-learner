@@ -1,88 +1,55 @@
 # Installation
 
-This repository is an agent skill. Install the whole directory, not just `SKILL.md`, because the skill depends on `references/`, `scripts/`, and `agents/`.
+Install the complete repository as a skill. Keep the user's figure KB outside
+the skill directory.
 
-## Codex
+## Runtime
 
-Recommended location on Windows:
+Python 3.10 or newer is required. The package declares Pydantic 2, PyYAML,
+NumPy, Matplotlib, and Pillow in `pyproject.toml`. This repository does not
+install dependencies automatically.
+
+## Skill Locations
+
+Codex on Windows:
 
 ```text
 %USERPROFILE%\.codex\skills\nature-figure-learner\
 ```
 
-Recommended location on Unix-like systems:
+Unix-like agents may use `~/.codex/skills/nature-figure-learner/`. Claude and
+other agents should use their documented skill directory. Preserve
+`SKILL.md`, `references/`, `scripts/`, `src/`, and `agents/` together.
 
-```text
-~/.codex/skills/nature-figure-learner/
-```
+## KB Setup
 
-## Claude / Claude Code
-
-Recommended location on Windows:
-
-```text
-%USERPROFILE%\.claude\skills\nature-figure-learner\
-```
-
-Recommended location on Unix-like systems:
-
-```text
-~/.claude/skills/nature-figure-learner/
-```
-
-## Hermes / Hermess / Generic Agents
-
-For other agents, install the full repository wherever that agent expects reusable skills or tool instructions. The agent must be able to read:
-
-```text
-SKILL.md
-references/
-scripts/
-agents/
-```
-
-See [AGENT_COMPATIBILITY.md](AGENT_COMPATIBILITY.md) for adapter guidance.
-
-## First Invocation Gate
-
-Before any workflow that reads or writes the figure KB, the agent must resolve the KB location:
+From the skill root, run the First Invocation Gate:
 
 ```bash
 python scripts/kb_location_manager.py --get-path
 ```
 
-If the command returns `NOT_CONFIGURED`, run setup:
+If it returns `NOT_CONFIGURED`, run the setup flow and select a location
+outside this repository:
 
 ```bash
 python scripts/kb_location_manager.py --setup
 ```
 
-The KB should be stored outside the skill repository. Good locations include:
+## Direct Use From a Checkout
 
-```text
-~/.codex/figure-kb
-<data-drive>/figure-kb
-<custom-absolute-path>/figure-kb
-```
-
-Do not store real KB data in this repository.
-
-## Verify Installation
-
-From the skill root:
+No package installation is required for the launcher:
 
 ```bash
-python -B scripts/kb_location_manager.py --get-path
-python -B -m py_compile scripts/kb_location_manager.py scripts/self_evolution_engine.py scripts/test_self_evolution_engine.py
-python -B -m unittest scripts/test_self_evolution_engine.py
+python scripts/figure_kb.py schema export
 ```
 
-The first command should print a configured path or `NOT_CONFIGURED`. The compile and unittest commands should succeed.
+Commands are non-interactive and return a single JSON Envelope on stdout.
 
-## Relationship to nature-figure
+## Verification
 
-This skill works without `nature-figure`.
-
-If `nature-figure` is also installed, use an explicit bridge: query this KB first, then pass the selected pattern's layout, colors, typography, success cases, and caveats into the figure creation workflow.
-
-Do not assume automatic integration unless the active `nature-figure` skill explicitly documents it.
+```bash
+python -B -m unittest discover -s tests -t . -v
+python -B -m unittest scripts.test_self_evolution_engine -v
+python -B -m py_compile scripts/figure_kb.py scripts/kb_location_manager.py scripts/self_evolution_engine.py
+```
