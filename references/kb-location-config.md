@@ -16,7 +16,9 @@ If output is `NOT_CONFIGURED`, the agent must stop the current workflow and prom
 2. `$CODEX_HOME/figure-kb-config.json`, if `CODEX_HOME` is set and the config exists.
 3. `~/.codex/figure-kb-config.json`, if the config exists.
 4. Legacy `~/.claude/figure-kb-config.json`, if the config exists.
-5. Default `~/.codex/figure-kb`.
+5. No automatic fallback. The setup prompt suggests `~/.codex/figure-kb`,
+   but `--get-path` returns `NOT_CONFIGURED` until setup or an explicit
+   environment/configuration is present.
 
 Write new configuration to the Codex config path. Read the legacy config only to preserve existing data.
 
@@ -56,11 +58,17 @@ If the user provides a direct absolute path, use that path during setup.
   index.json
   patterns/
     chart-type/
-    color-scheme/
-    layout-archetype/
-    journal/
+      <chart-type>/
+        <pattern-id>.md
+  meta-patterns/
+  reflections/
   reports/
 ```
+
+The Repository stores authoritative Markdown records only under
+`patterns/chart-type/<chart-type>/`. Color scheme, layout archetype, journal,
+and other facets are fields used for filtering and indexing; they are not
+parallel storage trees.
 
 Create `index.json` as an empty JSON array when it does not exist:
 

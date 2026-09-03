@@ -9,7 +9,8 @@ Any compatible agent must be able to read `SKILL.md`, preserve the relative
 2. Run the First Invocation Gate before KB operations.
 3. Keep generated KB data outside the skill repository.
 4. Treat scripts as agent-invoked tools, not background services.
-5. Ask optional feedback questions; never fabricate ratings or notes.
+5. After a pattern is persisted, offer optional feedback; never fabricate
+   ratings or notes.
 6. Explain recommendations with quality, objective validation, reuse,
    feedback, memory evidence, and caveats.
 

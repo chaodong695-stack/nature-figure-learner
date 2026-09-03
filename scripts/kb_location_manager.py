@@ -96,9 +96,8 @@ def initialize_kb_structure(kb_path):
     dirs = [
         kb_path,
         kb_path / "patterns" / "chart-type",
-        kb_path / "patterns" / "color-scheme",
-        kb_path / "patterns" / "layout-archetype",
-        kb_path / "patterns" / "journal",
+        kb_path / "meta-patterns",
+        kb_path / "reflections",
         kb_path / "reports",
     ]
 

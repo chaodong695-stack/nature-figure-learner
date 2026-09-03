@@ -1,0 +1,198 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FigurePattern",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "1.0", "default": "1.0" },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,127}$" },
+    "source_type": { "$ref": "#/definitions/SourceType" },
+    "source_doi": { "type": ["string", "null"] },
+    "source_journal": { "type": ["string", "null"] },
+    "source_year": { "type": ["integer", "null"], "minimum": 1600, "maximum": 2200 },
+    "source_figure": { "type": ["string", "null"] },
+    "source_paper_title": { "type": ["string", "null"] },
+    "source_url": { "type": ["string", "null"] },
+    "chart_type": { "$ref": "#/definitions/ChartType" },
+    "chart_type_description": { "type": ["string", "null"] },
+    "sub_chart_types": { "type": "array", "items": { "$ref": "#/definitions/ChartType" } },
+    "layout_archetype": { "$ref": "#/definitions/LayoutArchetype" },
+    "panel_count": { "type": "integer", "minimum": 1 },
+    "color_scheme": { "$ref": "#/definitions/ColorScheme" },
+    "color_strategy_description": { "type": ["string", "null"] },
+    "extracted_colors": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+    },
+    "font_family": {
+      "anyOf": [
+        { "$ref": "#/definitions/FontFamily" },
+        { "type": "string" },
+        { "type": "null" }
+      ]
+    },
+    "base_font_size_pt": { "type": ["number", "null"], "exclusiveMinimum": 0, "maximum": 72 },
+    "matched_nature_figure_pattern": { "type": ["integer", "null"], "minimum": 1, "maximum": 16 },
+    "novel_pattern": { "type": "boolean", "default": false },
+    "novel_pattern_name": { "type": ["string", "null"] },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "quality_rating": { "type": ["number", "null"], "minimum": 1, "maximum": 5 },
+    "confidence": { "$ref": "#/definitions/Confidence", "default": "medium" },
+    "analysis_date": { "type": "string", "format": "date" },
+    "validation_score": { "type": ["integer", "null"], "minimum": 1, "maximum": 5 },
+    "application_count": { "type": "integer", "minimum": 0, "default": 0 },
+    "last_applied": { "type": ["string", "null"], "format": "date" },
+    "application_feedback": { "type": "array", "items": { "$ref": "#/definitions/Feedback" } },
+    "comparative_notes": { "type": "array", "items": { "type": "object" } },
+    "memory_score": { "anyOf": [{ "$ref": "#/definitions/MemoryScore" }, { "type": "null" }] },
+    "success_cases": { "type": "array", "items": { "$ref": "#/definitions/CaseNote" } },
+    "failure_cases": { "type": "array", "items": { "$ref": "#/definitions/CaseNote" } },
+    "recommendation_rationale": { "type": ["string", "null"] },
+    "relations": { "$ref": "#/definitions/PatternRelations" },
+    "scientific_claim": { "type": ["string", "null"] },
+    "evidence_hierarchy": { "type": ["string", "null"] },
+    "hero_panel": { "type": ["string", "null"] },
+    "statistical_annotations": { "type": ["string", "null"] },
+    "grid_structure": { "type": ["string", "null"] },
+    "backend": { "type": ["string", "null"] },
+    "figsize": {
+      "type": ["array", "null"],
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "type": "number" }
+    },
+    "export_formats": { "type": "array", "items": { "type": "string" } },
+    "dpi": { "type": ["integer", "null"], "minimum": 72, "maximum": 2400 },
+    "extensions": { "type": "object" }
+  },
+  "required": [
+    "id",
+    "source_type",
+    "chart_type",
+    "layout_archetype",
+    "panel_count",
+    "color_scheme",
+    "analysis_date"
+  ],
+  "allOf": [
+    {
+      "if": { "properties": { "chart_type": { "const": "other" } } },
+      "then": {
+        "required": ["chart_type_description"],
+        "properties": {
+          "chart_type_description": { "type": "string", "pattern": "\\S" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "color_scheme": { "const": "other" } } },
+      "then": {
+        "required": ["color_strategy_description"],
+        "properties": {
+          "color_strategy_description": { "type": "string", "pattern": "\\S" }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["novel_pattern"],
+        "properties": { "novel_pattern": { "const": true } }
+      },
+      "then": {
+        "required": ["novel_pattern_name"],
+        "properties": {
+          "novel_pattern_name": { "type": "string", "pattern": "\\S" }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "SourceType": {
+      "type": "string",
+      "enum": ["image", "code", "manual"]
+    },
+    "ChartType": {
+      "type": "string",
+      "enum": [
+        "grouped-bar", "stacked-bar", "horizontal-bar", "line-trend",
+        "multi-line", "heatmap", "scatter", "bubble", "radar-polar",
+        "forest-plot", "violin", "box", "density", "pie-donut",
+        "fill-between", "sankey", "upset", "image-plate", "schematic",
+        "network", "other"
+      ]
+    },
+    "LayoutArchetype": {
+      "type": "string",
+      "enum": [
+        "quantitative-grid", "schematic-led-composite",
+        "image-plate-quant", "asymmetric-mixed-modality"
+      ]
+    },
+    "ColorScheme": {
+      "type": "string",
+      "enum": [
+        "nature-nmi-pastel", "nature-imaging", "nature-clinical",
+        "nature-genomics", "nature-material", "categorical-high-contrast",
+        "sequential-single-hue", "diverging", "monochrome", "other"
+      ]
+    },
+    "FontFamily": {
+      "type": "string",
+      "enum": ["Arial", "Helvetica", "Times", "serif", "sans-serif", "other"]
+    },
+    "Confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"]
+    },
+    "Feedback": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "rating": { "type": "number", "minimum": 1, "maximum": 5 },
+        "notes": { "type": "string" }
+      },
+      "required": ["date", "rating", "notes"]
+    },
+    "CaseNote": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "date": { "type": ["string", "null"], "format": "date" },
+        "note": { "type": "string" }
+      },
+      "required": ["note"]
+    },
+    "PatternRelations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "similar_to": { "type": "array", "items": { "type": "string" } },
+        "superseded_by": { "type": "array", "items": { "type": "string" } },
+        "contraindicated_for": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "MemoryScore": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "total": { "type": "number", "minimum": 0, "maximum": 100 },
+        "components": { "$ref": "#/definitions/MemoryScoreComponents" },
+        "formula": { "type": "string" }
+      },
+      "required": ["total", "components", "formula"]
+    },
+    "MemoryScoreComponents": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "quality": { "type": "number", "minimum": 0 },
+        "validation": { "type": "number", "minimum": 0 },
+        "reuse": { "type": "number", "minimum": 0 },
+        "feedback": { "type": "number", "minimum": 0 },
+        "recency": { "type": "number", "minimum": 0 }
+      },
+      "required": ["quality", "validation", "reuse", "feedback", "recency"]
+    }
+  }
+}

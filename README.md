@@ -34,7 +34,7 @@ python scripts/figure_kb.py index rebuild
 
 Progress and debug output use stderr. `unsupported` is a capability result and
 exits 0; command errors return a non-zero status. See `INSTALL.md` and
-`references/query-templates.md` for details.
+`references/WF3-query.md` for details.
 
 The initial renderer adapters support grouped/stacked/horizontal bars,
 line-trend/multi-line, scatter/bubble, heatmap, violin, and box. Other chart
